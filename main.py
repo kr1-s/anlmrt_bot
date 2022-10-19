@@ -8,6 +8,8 @@ from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, ConversationHandler, MessageHandler, \
     filters, CallbackQueryHandler, Job, JobQueue
 
+# Добавил коммент
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
