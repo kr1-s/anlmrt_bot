@@ -1,17 +1,19 @@
 import logging
 import sqlite3
+import time
+import schedule
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler, ConversationHandler, MessageHandler, \
-    filters, CallbackQueryHandler
+    filters, CallbackQueryHandler, Job, JobQueue
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-conn = sqlite3.connect('C:/Users/skriv/Desktop/SQLiteStudio/anlmrt_db.db', check_same_thread=False)
+conn = sqlite3.connect('anlmrt_db.db', check_same_thread=False)
 cursor = conn.cursor()
 
 
@@ -84,6 +86,7 @@ async def get_discription(update: Update, context: CallbackContext):
 
 async def get_members(update: Update, context: CallbackContext):
     button = ReplyKeyboardMarkup([["Оставить пустым"]], resize_keyboard=True, one_time_keyboard=True)
+    print(context.user_data["chat"])
     await context.bot.send_message(chat_id=update.effective_chat.id,
                                    text="Отметье людей, которых хотите пригласить через \"@\", "
                                         "если хотите оставить пустым, нажмите кнопку",
@@ -112,11 +115,17 @@ async def accept_data(update: Update, context: CallbackContext):
     if "change" not in context.user_data:
         context.user_data["members"] = update.effective_message.text  # сохраняем участников встречи
     else:
-        try:
-            #TODO присваивается последнее сообщение в чате, исправить
-            context.user_data[context.user_data["new_value"]] = update.effective_message.text
-        except:
+        # try:
+        #     #TODO присваивается последнее сообщение в чате, исправить
+        #     context.user_data[context.user_data["new_value"]] = update.effective_message.text
+        # except:
+        #     print(update.callback_query.data)
+        #     context.user_data[context.user_data["new_value"]] = update.callback_query.data
+        if update.effective_message.from_user.is_bot:
+            print(update.callback_query.data)
             context.user_data[context.user_data["new_value"]] = update.callback_query.data
+        else:
+            context.user_data[context.user_data["new_value"]] = update.effective_message.text
 
     for el in context.user_data:
         if context.user_data[el] == "Оставить пустым":
@@ -191,11 +200,30 @@ async def register_chat(update: Update, context: CallbackContext):
     conn.commit()
 
 
-async def chat(update: Update, context: CallbackContext):
-    members = cursor.execute('select * from conversation').fetchall()
-    chat_id = cursor.execute(('select chat_id from chat where title like "{}"'.format(members[0][6]))).fetchall()[0][0]
-    text = """{} встреча начнётся через 15 минут.""".format(members[0][5])
-    await context.bot.send_message(chat_id=chat_id, text=text)
+# async def chat(update: Update, context: CallbackContext):
+#     members = cursor.execute('select * from conversation').fetchall()
+#     chat_id = cursor.execute(('select chat_id from chat where title like "{}"'.format(members[0][6]))).fetchall()[0][0]
+#     text = """{} встреча начнётся через 15 минут.""".format(members[0][5])
+#     await context.bot.send_message(chat_id=chat_id, text=text)
+
+
+async def alarm(update: Update, context: CallbackContext):
+    job = context.job
+    await context.bot.send_message(job.chat_id, text=f"Встреча {job.label} началась. \nУчастники: {job.members}")
+
+
+async def create_job(update: Update, context: CallbackContext):
+    conversations = cursor.execute(
+        'select label, date, description, author, member, chat_id from conversation').fetchall()
+    for conv in conversations:
+        print(conv)
+    # JobQueue.run_once()
+
+
+def job():
+    print("I'm working...")
+
+
 
 
 if __name__ == '__main__':
@@ -203,7 +231,7 @@ if __name__ == '__main__':
 
     start_handler = CommandHandler('start', start)
     register_chat = CommandHandler("join_chat", register_chat)
-    test = CommandHandler("chat", chat)
+    test = CommandHandler("chat", create_job)
     timer = ConversationHandler(
         entry_points=[CommandHandler('set_timer', get_chat)],
         states={
